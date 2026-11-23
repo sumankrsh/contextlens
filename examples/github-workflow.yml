@@ -1,0 +1,29 @@
+# Example: fail a pull request when an agent's recorded trace wastes too much
+# context or loses an instruction. Copy to .github/workflows/context-check.yml
+# and point it at a trace your test suite writes (for example with
+# contextlens.recorder.Recorder).
+name: Context check
+
+on: [pull_request]
+
+jobs:
+  context:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install git+https://github.com/sumankrsh/contextlens
+      - run: pip install -e . && pytest tests/agent_smoke_test.py  # writes traces/smoke.trace.json
+      - name: Check the context
+        run: |
+          contextlens analyze traces/smoke.trace.json --max-waste 15 --fail-on high \
+            --markdown context-report.md --html context-report.html
+      - if: always()
+        run: cat context-report.md >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: context-report
+          path: context-report.html
